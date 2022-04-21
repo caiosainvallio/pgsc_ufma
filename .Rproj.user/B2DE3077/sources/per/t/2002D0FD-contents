@@ -1,0 +1,452 @@
+---
+title: "Curso de Inferência Causal"
+output: html_document
+---
+
+
+# Métodos de ajuste para confundimento
+
+- Randomização - ideal    
+
+- Métodos generalizados:
+  - Padronizacao - fórmula g paramétrica
+  - Ponderação pelo inverso da probabilidade de seleção em modelos estruturais marginais
+  - Estimação g de modelos estruturais aninhados
+
+- Métodos baseados em estratificação:
+  - Esratificação (não paramétrica) - regressão (paramétrica)
+  - Restrição
+  - Pareamento - escores de propensão
+
+<br>
+<br>
+<br>
+
+
+# Exemplo (Hernan & Robins, 2019)
+
+
+| L | A | Y |
+|:-:|:-:|:-:|
+| 0 | 0 | 0 |
+| 0 | 0 | 1 |
+| 0 | 0 | 0 |
+| 0 | 0 | 0 |
+| 0 | 1 | 0 |
+| 0 | 1 | 0 |
+| 0 | 1 | 0 |
+| 0 | 1 | 0 |
+| 1 | 0 | 1 |
+| 1 | 0 | 1 |
+| 1 | 0 | 0 |
+| 1 | 1 | 1 |
+| 1 | 1 | 1 |
+| 1 | 1 | 1 |
+| 1 | 1 | 1 |
+| 1 | 1 | 1 |
+| 1 | 1 | 1 |
+| 1 | 1 | 0 |
+| 1 | 1 | 0 |
+| 1 | 1 | 0 |
+
+
+A -> Tratamento (transplante=1, sem transplante=0)    
+Y -> Desfecho (morreu=1; não morreu=0)    
+L -> Gravidade (pct grave=1; pct não grave=0)   
+
+<br>
+<br>
+
+por permutabilidade:
+$$
+Pr[Y=1|A=1] = Pr[Y^{a=1}=1]
+$$
+
+Probabilidade do desfecho se todos tivessem sido tratados: real 13    
+
+L=0 -> 1/4=0.25 -> 40% (8/20 - não graves)   
+L=1 -> 6/9=0.66 -> 60% (12/20 - graves)    
+`0.25*0.40 + 0.66*0.60 = 0.1+0.4=0.5`
+
+
+<br>
+<br>
+
+por permutabilidade:
+$$
+Pr[Y=1|A=0] = Pr[Y^{a=0}=1]
+$$
+
+Probabilidade do desfecho se todos não tivessem sido tratados: real 7    
+
+L=0 -> 1/4=0.25 -> 40% (8/20 - não graves)   
+L=1 -> 2/3=0.66 -> 60% (12/20 - graves)    
+`0.25*0.40 + 0.66*0.60 = 0.1+0.4=0.5`
+
+<br>
+
+Efeito causal = 0.5-0.5 = 0   
+
+
+Fórmula de ajuste:
+$$
+\sum_{l} Pr[Y|L=l, A=a] * Prob[L=l]
+$$
+
+Método não paramétrico, usado para poucos confundidores
+
+<br>
+<br>
+<br>
+
+# Ponderação pelo inverso da probabilidade de seleção
+
+
+1) Calcular a probabilidade de seleção para cada indivíduo    
+2) Ponderar a estimativa pelo inverso desta probabilidade de seleção    
+
+<br>
+
+Os indiv;iduos que tiverem __maior__ probabilidade de serem selecionados para receber o tratamento terão um peso __menor__.    
+Os indivíduos que tiverem __menor__ probabilidade de serem selecionados para receber o tratamento terão um peso __maior__.
+
+<br>
+
+OBJETIVO -> balancear o estudo
+
+
+<br>
+
+Mesmo Exemplo (Hernan & Robins, 2019)   
+
+<br>
+
+1) Calcular a probabilidade de seleção para cada indivíduo:   
+Probabilide de ser tratado não sendo grave -> 4/8 = 0.50    
+Probabilide de não ser tratado não sendo grave -> 4/8 = 0.50    
+Probabilide de ser tratado sendo grave -> 9/12 = 0.75    
+Probabilide de não ser tratado sendo grave -> 3/12 = 0.25    
+
+<br>
+
+2) Ponderar a estimativa pelo inverso desta probabilidade de seleção:   
+não grave tratado -> 1/0.5=2    
+não grave não tratado -> 1/0.5=2    
+grave tratado -> 1/0.75=1.33    
+grave não tratado -> 1/0.25=4   
+
+<br>
+<br>
+<br>
+
+
+
+# Modelo expplicativo estrutural marginal
+
+
+- Estrutural: respostas contrafatuais   
+
+- Marginal (não condicional): não inclui nenhuma covariável (saturado)    
+
+
+<br>
+
+Exemplo:    
+Fumar durante a gravidez gera algum efeito no peso ao nascer?   
+
+Y (desfecho) -> peso ao nascer    
+T (exposição) -> mãe fumante ou não fumente   
+C (confundidor) -> Idade da mãe
+
+
+<br>
+<br>
+
+
+# Escore de propensão
+
+Probabilidade condicional de tratameto
+
+$$
+Pr[T=1|C]
+$$
+
+Qual a probabilidade da mãe fumar, em função da sua idade?
+
+
+<br>
+<br>
+
+# Cálculo dos pesos para tratamento binário
+
+- Para os expostos ou grupo de tratamento:
+
+Fumantes
+
+$$
+W^{T}=1/Pr[T=1|C]
+$$
+
+
+- Para os não expostos ou grupo controle:
+
+Não fumantes
+
+$$
+W^{T}=1/(1-Pr[T=1|C])
+$$
+
+
+<br>
+<br>
+
+# Modelo preditivo logístico
+
+
+Modelo `idade[C] ~ fumar[T]`: qual a probabilidade de fumar em função da idade da mãe?    
+
+
+Predict_pf = predição da probabilidaed de fumar (OR)   
+ipf = if_else(smoke == 1,  1/Predict_pf, 1/(1-Predict_pf))
+
+Inverso da probabilidade de fumar adicionado como peso no modelo `peso[Y] ~ fumar[T], weight=ipf`   
+
+<br>
+<br>
+
+
+# Verificar balanço - permutabilidade
+
+
+pacote `ipw::tableOne`    
+
+Diferenças nas médias padronizadas devem ser próximas de zero e a razão de variância deve ser próxima de 1    
+
+
+Avaliar com `density_plot`
+
+<br>
+<br>
+
+
+# Cálculo dos pesos para o inverso da probabilidade de seleção
+
+
+- __Confundimento:__ probabilidade de tratamento em função das variáveis preditoras do tratamento
+
+$$
+W^{T}=\frac{1}{f(T|C)}
+$$
+
+- __Viés de seleção:__ probabilidade de participação no estudo em função das variáveis (tratamento e confundidoras)
+
+
+$$
+W^{Part}=\frac{1}{Pr[Part=1|T,Preditores]}
+$$
+
+
+
+- __Peso Final__ $=W^{T}*W^{Part}$
+
+
+
+<br>
+<br>
+
+
+# Passos na análise com escore de propensão
+
+1. Análise ajustada em modelos de regresão convencionais
+2. Verificação do balanceamento antes da implementação do escore de propensão
+3. Estimação do escorte de propensão
+4. Ponderação ou pareamento com escore de propensão
+5. Verificação do balanceamento depois da implementação do escore de propensão 
+6. Cálculo do efeito causal em modelos ponderados ou com pareamento pelo escore de propensão
+
+
+<br>
+<br>
+
+
+# Exemplo
+
+- Lalonde -> 185 tratados e 429 controles    
+
+- NSWD -> National Supported Work Demonstration   
+
+- TRATAMENTO -> Impacto de um programa de retreinamento profissional na renda do indivíduo    
+
+- DESFECHO -> Renda em 1978   
+
+
+<br>
+<br>
+
+
+# Verificar balanceamento entre tratados e não tratados
+
+- Variáveis contínuas -> teste t de Student   
+- Valriáveis categóricas -> teste do chi-quadrado   
+
+- Problemas: dependente do tamanho da amostra
+  - Amostras pequenas -> falso negativo   
+  - Amostras grandes -> significante, mas importante?
+
+
+
+<br>
+<br>
+
+
+# Outros métodos
+
+- Diferença absoluta nas médias padronizadas entre os grupos tratamento e controle
+
+$$
+\frac{\bar{x}_ {t}-\bar{x}_{c}}{\sqrt{}(s^{2}_{t}+s^{2}_{c})/2}
+$$
+
+Ideal < 0.10 desvio padrão    
+Aceit;avel < 0.25 desvio padrão   
+
+<br>
+
+- Teste de Kolmogorov-Smirnov -> compara toda a distribuição (p>=0.05)
+
+- Quais variáveis incluir no ajuste?
+  - Pela significância?
+  - Pela teora?
+  
+
+
+<br>
+<br>
+
+
+# Seleção de covariáveis (Leite, 2017)
+
+
+INCLUIR COM BASE NA TEORIA    
+- Confundidores - causa do tratamento e do desfecho diminui viés e diminui variância    
+- Preditores do desfecho dimunui variância, mas quebra cegamento    
+- menor erro de mensuração
+
+
+NÃO INCLUIR   
+- Preditores do tratamento aumaenta a variância   
+- Mediadores    
+- Descendentes dos tratamento   
+- Colisores   
+
+
+SELECIONAR COM APOIO DE DAG (Gráfico Acíclico Direcionado)    
+- Criério da porta de trás
+
+
+
+
+<br>
+<br>
+
+
+# Variável quantitativa - idade
+
+```{r message=FALSE, warning=FALSE}
+library(Matching)
+data("lalonde")
+
+t.test(age~treat, data=lalonde, var.equal=TRUE)
+
+```
+
+
+<br>
+<br>
+
+
+# Variável qualitativa - Casados
+
+```{r}
+descr::crosstab(lalonde$treat, lalonde$married, prop.r = TRUE, chisq = TRUE, plot = FALSE)
+```
+
+
+
+<br>
+<br>
+
+
+# Diferença entre tratados e controles
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+
+xvars <- c("age", "re74", "re75", "educ", "nodegr", "married", "black", "hisp")
+
+table1 <- tableone::CreateTableOne(vars = xvars, 
+                                   strata = "treat", 
+                                   data = lalonde %>% mutate(nodegr = factor(nodegr),
+                                                             married = factor(married),
+                                                             black = factor(black),
+                                                             hisp = factor(hisp)), 
+                                   test = TRUE)
+
+print(table1, smd = TRUE)
+```
+
+
+<br>
+<br>
+
+
+# Prática usual
+
+Estimar efeito do tratamento em um modelo de regressão com ajuste para fatores de confusão
+
+
+```{r}
+reg <- lm(re78 ~ treat + age + educ + black + hisp + nodegr + married + re74 + re75, data = lalonde)
+
+reg %>% summary
+```
+
+
+<br>
+<br>
+
+# problemas
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
