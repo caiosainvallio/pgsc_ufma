@@ -792,6 +792,394 @@ Problema: não leva em conta relações não lineares e interações entre as va
 <br>
 
 
+# Escore de propensão
+
+- É a probabilidade condicional (predita) de tratamento em função das características pré-tratamento (determeinates do tratamento)   
+- Abordagem contrafatual - comparar o desfecho nos tratados com os controles (representam os tratados se estes não tivessem sido tratados) - permutabilidade   
+
+- Estimativa marginal do efeito causal    
+
+
+<br>
+<br>
+
+
+
+# Modelo logístico
+
+```{r message=FALSE, warning=FALSE}
+modelo <- glm(treat ~ pobreza + medico, data = mckee, family = binomial(link = "logit")) 
+modelo %>% summary
+```
+```{r message=FALSE, warning=FALSE}
+mckee$ps <- modelo$fitted.values
+
+mckee %>% kableExtra::kable() %>% kableExtra::kable_styling()
+```
+
+
+
+<br>
+<br>
+
+
+- __ATT__ - Efeito médio do tratamento para os tratados   
+
+- Foram selecionadas para controle somente as vilas que se parecem com as vilas do grupo de tratamento e não com a população geral   
+
+- Diminui a área de suporte comum   
+
+
+<br>
+<br>
+
+
+# Verificar área de suporte comum
+
+
+```{r message=FALSE, warning=FALSE}
+mckee %>% 
+  boxplot(ps ~ treat, data = .,
+          xlab = "Programa de intervenção",
+          ylab = "Escore de propensão")
+
+
+```
+
+- Para pareamento:    
+  - ATT - todos os casos teriam controles?    
+  - ATE - todos os casos terima controles e todos os controles teriam casos?    
+  
+
+
+<br>
+<br>
+
+
+```{r message=FALSE, warning=FALSE}
+mckee %>% kableExtra::kable() %>% kableExtra::kable_styling()
+```
+
+
+__ATE__ - Efeito médio do tratamento para os tratados
+
+```{r}
+(10+15+22+19)/4 - (19+25+25+25)/4
+```
+
+
+
+
+<br>
+<br>
+
+
+# Passos
+
+- Escolher variáveis que influenciam o tratamento   
+- Calcular o escore de propensão    
+- Parear pelo escore de propensão   
+- Checar se balanço foi atingido    
+- Calcula efeito causal   
+
+
+
+
+
+<br>
+<br>
+
+
+# Escore de propensão
+
+- Logito do escore de propensão - resolve o problema quando os escores ficam muito proximos de zero ou de um    
+
+- Escores das vilas 7, 8 e 9 muito proximos de zero   
+
+$$
+log(e_{i}(p)) = log\left(\frac{e_{i}(p)}{1-e_{i}(p)}\right)
+$$
+
+<br>
+<br>
+
+
+
+# Modelo logístico
+
+Calcular e converter escore de propensão para logito
+
+```{r message=FALSE, warning=FALSE}
+mckee$pslogit <- log(mckee$ps/(1-mckee$ps))
+
+mckee %>% kableExtra::kable() %>% kableExtra::kable_styling()
+```
+
+
+<br>
+<br>
+
+
+# Checar balanço
+
+- Balanço - determinar se foi atingido equilibrio entre os grupos de tratamento e controle    
+
+- Comparar grupo tratado com o novo grupo controle    
+
+1. Distribuição das variáveis preditoras do tratamento    
+
+2. Distribiução do escore de propensão    
+
+
+<br>
+<br>
+
+
+
+```{r message=FALSE, warning=FALSE}
+
+mckee %>% 
+  boxplot(cmi ~ treat, data=.)
+
+
+mckee %>% 
+  ggplot(aes(x = cmi, color = treat)) +
+  geom_density()
+
+mckee %>% 
+  filter(treat == 1) %>% 
+  ggplot(aes(x = cmi)) +
+  geom_density()
+
+mckee %>% 
+  filter(treat == 0) %>% 
+  ggplot(aes(x = cmi)) +
+  geom_density()
+```
+
+
+<br>
+<br>
+
+
+# Pareamento - vizinho mais próximo - pacote Matchit
+
+
+```{r message=FALSE, warning=FALSE}
+nnmatch <- MatchIt::matchit(treat ~ pobreza + medico, data = mckee,
+                            distance = "linear.logit", method = "nearest", ratio = 1)
+
+summary(nnmatch, standardize = TRUE)
+```
+<br>
+<br>
+
+Outro pacote
+
+```{r message=FALSE, warning=FALSE}
+matchps <- Matching::Match(Y = mckee$cmi, Tr = mckee$treat, X = mckee$ps, estimand = "ATT")
+summary(matchps)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+balance <- Matching::MatchBalance(treat ~ pobreza + medico, 
+                                  data = mckee, 
+                                  match.out = matchps)
+```
+
+<br>
+<br>
+
+# Problemas 
+
+- Amostra pequena - exemplo útil para desmonstrart como funciona o pareamento por escore de propensão   
+
+- O método não funciona bem quando quase todos aqueles com escores de propensão alto receberam o tratamento e quase todos com escore baixo não receberam - zona de suporte comum é pequena    
+
+
+<br>
+<br>
+
+
+
+# Vantagens do pareamento
+
+1. Menos sensível à forma funcional da relação entre as varaáveis (interação e linearidade)   
+
+2. O balanço pode ser melhor verificado empiricamente   
+
+
+<br>
+<br>
+
+
+# Desvantagens do pareamento
+
+- Perda de casos e controles - diminui área de suporte comum - diminui a generalização externa    
+
+- __Poderar com escore de propensão__ - usa todos os sujeitos do estudo - aumenta o poder e a generalização externa   
+
+
+
+<br>
+<br>
+
+
+
+# Tipos de pareamento
+
+- Com reposição - o mesmo controle pode ser pareado com vários casos - reduz viéz   
+
+- Sem reposição - o mesmo controle só é pareado uma vez com cada caso tratado - aumenta a probabilidade de pareamento ruim    
+
+- Razão entre casos e controles 1:1, n:1 (pareamento múltiplo - mais de um controle por caso)
+
+<br>
+<br>
+
+
+# Tipos de pareamento
+
+- __Vizinho mais próximo__ - pareado com o controle que tiver o escore de propensão mais próximo, escolhendo-se o primeiro controle que atinge o critério    
+
+- __Vizinho mais próximo__ fixando-se uma __distância máxima__ (caliper) - geralmente 0.2 desvios padrão    
+
+- __Ótimo__ - encontra os pares minimizando a distância absoluta média entre todos os pares - processo iterativo    
+
+- __Kernek__ - cada tratado é pareado com vários controles com peso proporcional à distância entre o tratado em cada controle   
+
+
+<br>
+<br>
+
+
+
+# Modificar escore de propensão para melhorar a especificação do modelo
+
+- Adicionar termos de interação   
+
+- Adicionar termos polinomiais - quadráticos, cúbicos   
+
+
+<br>
+<br>
+
+
+# Limitações 
+
+- Pareamento - perda de casos - dimimui a zona de suporte comum - diminui generalização externa   
+
+- Variáveis omitidas interferem na alocação do tratamento - quebra do pressuposto da ignorabilidade da alolcação do tratamento    
+
+$$
+(D^{1}, D^{0}) \perp\!\!\!\perp T|P
+$$
+
+
+<br>
+<br>
+
+
+
+# Análise de sensibilidade
+
+- Examinar qual magnitude um viés oculto por variáveis omitidas deve ter para modificar inferência    
+
+- Até que ponto os achados são sensíveis ao viés oculto?    
+
+- Rosenbaun (2002) - teste não paramétrico de Wilcoxon    
+
+- Cáculo do gamma - chance de viés oculto na alocação do tratamento   
+
+- Pacote `rbounds` R    
+
+- Quando os limites superior ou inferior do gamma mudarem de significante para não significante ou vice-versa -> indica o qunto a chance (gamma) precisa mudar para que a significância se modifique    
+
+- Resultado robusto -> mudança grande na chance necessária para provocar uma mudança na significância estatística   
+
+
+
+<br>
+<br>
+
+
+# Pareamento - vizinho mais próximo - pacote Matchit
+
+
+```{r message=FALSE, warning=FALSE}
+nnmatch <- MatchIt::matchit(treat ~ age + educ + black + hisp + nodegr + married + re74 + re75,
+                            data = lalonde, distance = "linear.logit", method = "nearest", ratio = 1)
+
+summary(nnmatch, standardize = TRUE)
+```
+
+
+
+<br>
+<br>
+
+# Estimativa do efeito causal - pacote Matchit
+
+
+```{r message=FALSE, warning=FALSE}
+match_ps <- MatchIt::match.data(nnmatch)
+
+fit <- lm(re78 ~ treat, data = match_ps)
+
+summary(fit)
+```
+
+
+<br>
+<br>
+
+# Vantagens - em relação ao ajuste para covariáveis
+
+1. o processo de diminuição do viés de seleção é separado da análise do desfecho - o pesquisador é cego em relação ao desfecho - tende a evitar resultados orientados pelos dados    
+
+2. Modelo do desfecho com menos parâmetros a serem estimados    
+
+3. Balanceamento entre as covariáveis nos grupos de tratamento e controle é feito independentemente do desfecho - nenhum pressuposto a respeito da forma funcional da relação entre as covariáveis e o desfecho é feito    
+
+4. Pormite testar balanceamento das covariáveis entre os grupos de tratamento e controle    
+
+5. Uso de método semiparamétrico (com poucos pressupostos) ou não paramétrico (livre de pressuposto) na primeira etapa    
+
+
+<br>
+<br>
+
+# Limitação 
+
+- Sensível a viés oculto por variável omitida   
+
+
+<br>
+<br>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
