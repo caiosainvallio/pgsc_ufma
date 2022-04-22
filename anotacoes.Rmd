@@ -393,6 +393,7 @@ table1 <- tableone::CreateTableOne(vars = xvars,
                                    test = TRUE)
 
 print(table1, smd = TRUE)
+
 ```
 
 
@@ -405,7 +406,7 @@ print(table1, smd = TRUE)
 Estimar efeito do tratamento em um modelo de regressão com ajuste para fatores de confusão
 
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 reg <- lm(re78 ~ treat + age + educ + black + hisp + nodegr + married + re74 + re75, data = lalonde)
 
 reg %>% summary
@@ -415,29 +416,380 @@ reg %>% summary
 <br>
 <br>
 
-# problemas
+
+
+# Problemas (da modelagem convencional)
+
+- Forma funcional da relação entre os preditores e o desfecho é linear?   
+- Ausência de interações?   
+
+
+- Não é possível saber se as variáveis ficaram balanceadas após o ajuste - permutabilidade?   
+
+
+<br>
+
+Solução: modelagem em duas etapas
+
+<br>
+<br>
+
+
+
+# Escore de propensão
+
+- Potencial para balancear variáveis observadas   
+
+- Probabilidade condicional de receber o tratamento em função das variáveis preditoras obseradas    
+
+$$
+E[p] = Pr(t=1|p)
+$$
+
+<br>
+<br>
+
+
+# Estimador em dois passos 
+
+- __MODELO PREDITIVO__ - Estimar a probabilidade de ser treinado em função das variáveis preditoras do treinamento (modelo logístico)    
+
+- __MODELO EXPLICATIVO__ - Estimar a diferença entre as médias de renda em 1978 entre os grupos que receberam treinamento ou não, pondernado pelo inverso da probabilidade de ter sido treinado (modelo de regressão linear)   
+
+
+
+<br>
+<br>
+
+
+
+# Escore de propensão
+
+Probabilidade condicional de tratamento em função de variáveis preditoras do tratamento (características pré-tratamento)   
+
+$$
+E[p]=Pr(t=1|p)
+$$
+
+
+_Qual a probabilidade do indivíduo ter sido treinado, em função das variáveis preditoras (raça, ser casado, renda em 1974, idade, educação)?_    
+
+
+
+<br>
+<br>
+
+
+# Métodos para estimativa do escore de propensão
+
+- Regressão logística    
+  1. Má especificação - não inclusão de termos polinomiais e interações - provoca não balanceamento   
+  2. Verificar linearidade do logito para variáveis contínuas - sensível à forma funcional    
+
+<br>
+
+- Modelagem Ampliada Generalizada (_Generalized Boosted Model_ - GBM) - Apredizagem de máquinas baseada em árvores de decisão e algorítmos iterativos - seleciona automaticamente covariáveis, termos polinomiais e interações para incluir no balanceamento    
+
+
+
+<br>
+<br>
+
+
+# Tipos de efeito causal
+
+_Average Treatment Effect_ - ATE    
+- $ATE=E[D^{1}-D^{0}]$  
+- Qual a eficácial relativa do tratamento em média na população?    
+
+<br>
+
+
+_Average Treatment Effect Among the Treatment_ - ATT    
+- $ATT=E[D^{1}-D^{0}|T=1]$  
+- Que resultado teriam os indivíduos do grupo controle se eles tivessem recebido o tratamento?    
+
+<br>
+
+
+_Average Treatment Effect Among the Control_ - ATC    
+- $ATT=E[D^{1}-D^{0}|T=0]$
+
+<br>
+
+__Obs:__ Em estudos controlados e aleatorizados $ATE = ATT$
+
+<br>
+<br>
+
+# Verificar área de suporte comum
+
+Qual estmativa de efeito causal será usada?
+
+
+```{r message=FALSE, warning=FALSE}
+
+red_prop <- glm(treat ~ age + re74 + re75 + educ + nodegr + married + black + hisp,
+                data = lalonde, family = binomial(link = "logit"))
+
+pscore <- red_prop$fitted.values
+
+lalonde %>% 
+  cbind(pscore) %>% 
+  boxplot(pscore~treat, data=., 
+          xlab = "Programa de Retreinamento Profissional",
+          ylab = "Escore de Propensão")
+
+```
+
+
+<br>
+<br>
+
+
+# Cácilo dos pesos para tratamento binário - ATE
+
+- Para os expostos ou grupo de tratamento:    
+Treinados   
+$$
+Peso^{T}=\frac{1}{Pr[T=1|P]}
+$$
+
+
+- Para os não expostos ou grupo controle:   
+Não Treinados   
+$$
+Peso^{T}=\frac{1}{(1-Pr[T=1|P])}
+$$
+
+
+<br>
+<br>
+
+
+
+# Cácilo dos pesos para tratamento binário - ATT
+
+- Para os expostos ou grupo de tratamento:    
+Treinados   
+$$
+Peso^{T}=1
+$$
+
+
+- Para os não expostos ou grupo controle:   
+Não Treinados   
+$$
+Peso^{T}=\frac{Pr[T=1|P]}{(1-Pr[T=1|P])}
+$$
+
+
+<br>
+<br>
+
+
+# Estimativa do escore de propensão por regressão logística
+
+
+```{r message=FALSE, warning=FALSE}
+lalonde$peso.ATE <- if_else(lalonde$treat == 1, 1/pscore, 1/(1-pscore))
+lalonde$pslog <- pscore
+
+lalonde %>% 
+  select(treat, age, educ, black, hisp, married, nodegr, re74, re75, pslog, peso.ATE) %>% 
+  head(10) %>% kableExtra::kable() %>% kableExtra::kable_styling()
+
+lalonde %>% 
+  select(treat, age, educ, black, hisp, married, nodegr, re74, re75, pslog, peso.ATE) %>% 
+  tail(10) %>% kableExtra::kable() %>% kableExtra::kable_styling()
+
+```
+
+
+<br>
+<br>
+
+
+# Modelo explicativo 
+
+Ponderado pelo inverso da probabilidade de seleção (tratamento)
+
+```{r message=FALSE, warning=FALSE}
+design_pslog <- survey::svydesign(ids = ~1, weights = ~peso.ATE, data = lalonde)
+
+glm <- survey::svyglm(re78 ~ treat, design = design_pslog) 
+
+glm %>% summary
+
+```
+
+
+
+<br>
+<br>
+
+
+# Escore de popensão
+
+- Estimar efeito causal na ausência de randomização   
+- Não há permutabilidade    
+- Os fatores determinantes do tratamento são conhecidos   
+- Recuperar a permutabilidade entre os grupos de tratamento e controle - controlar viés de seleção    
+
+
+<br>
+<br>
+
+
+# Exemplo (McKee, 2015)
+
+cmi -> Ceficiente de Mortalidade Infantil (desfecho)
+
+```{r message=FALSE, warning=FALSE}
+
+mckee <- tibble(obs = c(1, 2, 3, 4, 5, 6, 7, 8, 9),
+       treat = c(1, 1, 1, 1, 0, 0, 0, 0, 0),
+       cmi = c(10, 15, 22, 19, 25, 19, 4, 8, 6),
+       pobreza = c(.5, .8, .7, .6, .6, .5, .1, .3, .2),
+       medico = c(.01, .02, .01, .02, .01, .02, 0.4, .05, .04))
+
+mckee %>% kableExtra::kable() %>% kableExtra::kable_styling()
+```
+
+
+
+<br>
+<br>
+
+
+
+# Estimador em três passos
+
+1. __MODELO PREDITIVO__ - Estimar a probabilidade de cada vila participar do programa em função das variáveis preditoras da participação (modelo logístico)   
+
+2. __PAREAMENTO COM BASE NO ESCORE DE PROPENSÃO__ - ex: Vizinhos mais próximos    
+
+3. __MODELO EXPLICATIVO PÓS-PAREAMENTO__ - Estimar a diferença na mortalidade infantil entre as vilas que receberam o programa ou não (modelo de regressão linear) no arquivo pareado   
+
+
+
+<br>
+<br>
+
+
+# Comparação Naive
+
+Compara média entre grupos tratamento e controle
+
+```{r message=FALSE, warning=FALSE}
+mckee %>% t.test(cmi~treat, data=.) %>% parameters::model_parameters()
+```
+
+
+<br>
+<br>
+
+
+# Grupo intervenção
+
+- Maior mortalidade infantil    
+- Maior taxa de pobreza   
+- Menos taxa de médicos per capita
+
+<br>
+
+Possível viés de seleção: selecionaram para o tratamento as vilas que nessessitavam maior apoio
+
+
+```{r message=FALSE, warning=FALSE}
+library(ggdag)
+library(ggplot2)
+
+dagified <- ggdag::dagify(treat ~ pebreza,
+                   treat ~ medico,
+                   medico ~ pebreza,
+                   mortalidade ~ pebreza,
+                   mortalidade ~ medico,
+                   mortalidade ~ treat,
+                   labels = c("treat" = "Tratamento",
+                              "medico" = "Medico percapita",
+                              "pebreza" = "Nivel de pobreza",
+                              "mortalidade" = "Mortalidade infantil"),
+                   exposure = "treat",
+                   outcome = "mortalidade", latent = c("medico", "pebreza")
+                  )
+
+ggdag::ggdag(dagified, text_col = "red"
+             # text = FALSE, use_labels = "label"
+             ) + theme_dag()
+
+```
 
 
 
 
 
+<br>
+<br>
+
+# Solução usual 
+
+Modelo de regressão ajustado para confundidores   
+
+
+```{r message=FALSE, warning=FALSE}
+glm(cmi ~ treat + medico + pobreza , data = mckee) %>% summary
+```
+
+Problema: não leva em conta relações não lineares e interações entre as variáveis
 
 
 
 
+<br>
+<br>
+
+
+# Solução
+
+- Criar novo grupo controle - pareamento    
+
+- Para cada vila do grupo de tratamento - selecionar uma vila do grupo controle que seja a mais parecida com ela em termos de características prévias   
+
+- Que seja semelhante em relação às variáveis preditoras do pareamento    
+
+
+<br>
+<br>
+
+
+# Opção de pareamento manual
+
+
+- Com reposição   
+  - 1 com 6   
+  - 2 com 5   
+  - 3 com 5   
+  - 4 com 5   
+- 7, 9, 0 descartadas
+
+
+<br>
+<br>
+
+
+# Estimar escore de propensão
+
+- Problema: como identificar a melhor observação controle quando são muitas as variáveis determinantes do tratamento    
+
+- Solução: calcular a probabilidade de receber a intervenção em função das variáveis preditoras:    
+
+  - $Prob[treat=1|X1, X2]$
 
 
 
-
-
-
-
-
-
-
-
-
-
+<br>
+<br>
 
 
 
