@@ -1,0 +1,55 @@
+---
+title: "Exemplo de Análise com Escore de Propensão em Epidemiologia no R"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=FALSE, warning=FALSE)
+```
+
+```{r}
+# Pacotes necessários
+# install.packages("survey")
+# install.packages("twang")
+# install.packages("descr")
+# install.packages("MatchIt")
+# install.packages("Matching")
+# install.packages("rbounds")  # fora do CRAN-R
+# install.packages("optmatch")
+```
+
+# 1. Estimativa do efeito causal por meio do escore de propensão
+
+Neste exemplo, vamos realizar a estiamtiva do efeito de um programa de retreinamento profissional no rendimento dos indivíduos. Os dados são do *National Supported Work Project*, publicados por Dehejia e Wahba (1999). Este estudo experimental randomizado foi implementado na década de 1970. Teve como objetivo prover experiência de trabalho de 6 a 18 meses para trabalhadores em grande desvantagem social e econômica e sem habilidades básicas de trabalho. A amostra inclui ex-drogados, ex-condenados e pessoas que abandonaram o ensino médio. No quadro, constam as variáveis que utilizaremos nesse exercício.
+
++---------------+-----------------------------------------+----------------+
+| Variável      | Descrição                               | Codificação    |
++:=============:+:=======================================:+:==============:+
+| treat         | Participação no programa de treinamento | 0=não; 1=sim   |
++---------------+-----------------------------------------+----------------+
+| age           | Idade em anos                           | 17 a 55        |
++---------------+-----------------------------------------+----------------+
+| educ          | Escolaridade em anos de estudo          | 0 a 18         |
++---------------+-----------------------------------------+----------------+
+| black         | Cor da pele preta                       | 0=não; 1=sim   |
++---------------+-----------------------------------------+----------------+
+| hispan        | Hispânico                               | 0=não; 1=sim   |
++---------------+-----------------------------------------+----------------+
+| married       | Casado                                  | 0=não; 1=sim   |
++---------------+-----------------------------------------+----------------+
+| nodegree      | Sem diploma universitário               | 0=não; 1=sim   |
++---------------+-----------------------------------------+----------------+
+| re74          | Rendimento anual em dólares em 1974     | 0 a 35040.07   |
++---------------+-----------------------------------------+----------------+
+| re75          | Rendimento anual em dólares em 1975     | 0 a 25142.24   |
++---------------+-----------------------------------------+----------------+
+| re78          | Rendimento anual em dólares em 1978     | 0 a 60307.93   |
++---------------+-----------------------------------------+----------------+
+
+: Quadro 1 - Descrição das variáveis e codificação do banco de dados lalonde
+
+## 1.1 Ponderação com escore de propensão
+
+1.  Para abrir o arquivo é preciso, primeiro, carregar o pacote `twang`. Em seguida, abra o arquivo lalonde e peça a listagem das primeiras 5 e das últimas 5 observações. Carregue o pacote ou biblioteca `descr` e obtenha a frequência da variável treat. Observe que há 185 casos que receberam o retreinamento e 429 não treinados, que servirão como controles
