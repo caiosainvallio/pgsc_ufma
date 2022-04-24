@@ -7,6 +7,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message=FALSE, warning=FALSE)
+library(tidyverse)
 ```
 
 ```{r}
@@ -22,34 +23,438 @@ knitr::opts_chunk$set(message=FALSE, warning=FALSE)
 
 # 1. Estimativa do efeito causal por meio do escore de propensão
 
++------------+-----------------------------------------------+--------------------------+-----------------------------------------------------+
+| Sigla      | Efeito Causal                                 | Fórmula                  | O que é estimado                                    |
++============+===============================================+==========================+=====================================================+
+| ATE        | Efeito médio do tratamento                    | $E[D^{t=1}-D^{t=0}]$     | Eficácia relativa média do tratamento na população  |
++------------+-----------------------------------------------+--------------------------+-----------------------------------------------------+
+| ATT        | Efeito médio do tratamento entre os tratados  | $E[D^{t=1}-D^{t=0}|T=1]$ | Eficácia relativa média do tratamento nos tratados  |
++------------+-----------------------------------------------+--------------------------+-----------------------------------------------------+
+| ATC        | Efeito médio do tratamento entre os controles | $E[D^{t=1}-D^{t=0}|T=0]$ | Eficácia relativa média do tratamento nos controles |
++------------+-----------------------------------------------+--------------------------+-----------------------------------------------------+
+
+: Tipos de Efeito Causal
+
+\
+
 Neste exemplo, vamos realizar a estiamtiva do efeito de um programa de retreinamento profissional no rendimento dos indivíduos. Os dados são do *National Supported Work Project*, publicados por Dehejia e Wahba (1999). Este estudo experimental randomizado foi implementado na década de 1970. Teve como objetivo prover experiência de trabalho de 6 a 18 meses para trabalhadores em grande desvantagem social e econômica e sem habilidades básicas de trabalho. A amostra inclui ex-drogados, ex-condenados e pessoas que abandonaram o ensino médio. No quadro, constam as variáveis que utilizaremos nesse exercício.
 
-+---------------+-----------------------------------------+----------------+
-| Variável      | Descrição                               | Codificação    |
-+:=============:+:=======================================:+:==============:+
-| treat         | Participação no programa de treinamento | 0=não; 1=sim   |
-+---------------+-----------------------------------------+----------------+
-| age           | Idade em anos                           | 17 a 55        |
-+---------------+-----------------------------------------+----------------+
-| educ          | Escolaridade em anos de estudo          | 0 a 18         |
-+---------------+-----------------------------------------+----------------+
-| black         | Cor da pele preta                       | 0=não; 1=sim   |
-+---------------+-----------------------------------------+----------------+
-| hispan        | Hispânico                               | 0=não; 1=sim   |
-+---------------+-----------------------------------------+----------------+
-| married       | Casado                                  | 0=não; 1=sim   |
-+---------------+-----------------------------------------+----------------+
-| nodegree      | Sem diploma universitário               | 0=não; 1=sim   |
-+---------------+-----------------------------------------+----------------+
-| re74          | Rendimento anual em dólares em 1974     | 0 a 35040.07   |
-+---------------+-----------------------------------------+----------------+
-| re75          | Rendimento anual em dólares em 1975     | 0 a 25142.24   |
-+---------------+-----------------------------------------+----------------+
-| re78          | Rendimento anual em dólares em 1978     | 0 a 60307.93   |
-+---------------+-----------------------------------------+----------------+
++---------------+-----------------------------------------+---------------+
+| Variável      | Descrição                               | Codificação   |
++:=============:+:=======================================:+:=============:+
+| treat         | Participação no programa de treinamento | 0=não; 1=sim  |
++---------------+-----------------------------------------+---------------+
+| age           | Idade em anos                           | 17 a 55       |
++---------------+-----------------------------------------+---------------+
+| educ          | Escolaridade em anos de estudo          | 0 a 18        |
++---------------+-----------------------------------------+---------------+
+| black         | Cor da pele preta                       | 0=não; 1=sim  |
++---------------+-----------------------------------------+---------------+
+| hispan        | Hispânico                               | 0=não; 1=sim  |
++---------------+-----------------------------------------+---------------+
+| married       | Casado                                  | 0=não; 1=sim  |
++---------------+-----------------------------------------+---------------+
+| nodegree      | Sem diploma universitário               | 0=não; 1=sim  |
++---------------+-----------------------------------------+---------------+
+| re74          | Rendimento anual em dólares em 1974     | 0 a 35040.07  |
++---------------+-----------------------------------------+---------------+
+| re75          | Rendimento anual em dólares em 1975     | 0 a 25142.24  |
++---------------+-----------------------------------------+---------------+
+| re78          | Rendimento anual em dólares em 1978     | 0 a 60307.93  |
++---------------+-----------------------------------------+---------------+
 
 : Quadro 1 - Descrição das variáveis e codificação do banco de dados lalonde
 
+\
+\
+
 ## 1.1 Ponderação com escore de propensão
 
-1.  Para abrir o arquivo é preciso, primeiro, carregar o pacote `twang`. Em seguida, abra o arquivo lalonde e peça a listagem das primeiras 5 e das últimas 5 observações. Carregue o pacote ou biblioteca `descr` e obtenha a frequência da variável treat. Observe que há 185 casos que receberam o retreinamento e 429 não treinados, que servirão como controles
+1.  Para abrir o arquivo é preciso, primeiro, carregar o pacote `twang`. Em seguida, abra o arquivo lalonde e peça a listagem das primeiras 5 e das últimas 5 observações. Carregue o pacote ou biblioteca `descr` e obtenha a frequência da variável treat. Observe que há 185 casos que receberam o retreinamento e 429 não treinados, que servirão como controles. Esses 185 casos foram retirados do estudo randomizado e fazem parte de uma subamostra do sexo masculino. Para esses casos estavam disponíveis dados da renda em 1974, um anos antes da intervenção, iniciada em 1975. Os 429 controles foram retirados do inquérito observacional CPS-3 (*Current Population Survey*) e incluem homens desempregados em 1976, cuja renda estava abaixo do nível da pobreza em 1975.
+
+```{r}
+# Carregando o pacote twang
+library(twang)
+
+# Abrindo banco de dados - lalonde
+data(lalonde)
+
+# Obtendo listagem das 5 primeiras observacoes
+head(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+```{r}
+# Obtendo listagem das 5 primeiras observacoes
+tail(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+```{r}
+# Carregando a biblioteca descr
+library(descr)
+
+# Obtendo a distribuicao de frequencias da variavel tratamento - treat
+descr::freq(lalonde$treat)
+
+```
+
+\
+
+2.  Após a abertura do arquivo, vamos, primeiro, calcular as estimativas de associação em modelos de regressão simples (não ajustado) e múltipla (ajustado). A variável explanatória é treat, codificada com 1, quando o indivíduo participou do programa de retreinamento profissional, e 0, em caso contrário. A variável desfecho é a renda em 1978, três anos após o início do programa de retreinamento. Realizaremos ajuste para idade, escolaridade, cor da pele preta, hispânico, ser casado, não possuir diploma universitário e renda anual em 1975. Faremos, também, ajuste para renda anual em 1974, um ano antes do início do programa.
+
+Compare as duas estimativas do efeito médio (**ATE**)
+
+```{r}
+# Estimando associacao em modelo de regressao nao ajustado
+reg <- lm(re78 ~ treat, data = lalonde)
+summary(reg)
+
+```
+
+```{r}
+# Obtendo intervalo de confianca
+confint(reg)
+```
+
+Observe que a estimativa não foi significante (coeficiente -635 dólares, Intervalo de Confiança de 95% -1926 a 656 dólares, p=0.334).
+
+```{r}
+# Estimando associacao em modelo de regressao nao ajustado
+reg <- lm(re78 ~ treat + age + educ + black + hispan + nodegree 
+          + married + re74 + re75,  data = lalonde)
+summary(reg)
+
+```
+
+```{r}
+# Obtendo intervalo de confianca
+confint(reg)
+```
+
+A estimativa ajustada mostrou aumento de 1548 dólares, IC95% 14 a 3083 dólares, p=0.048 no grupo tratado, que frequentou o programa de retreinamento profissional, comparado com o grupo controle, que não participou do programa.
+
+\
+
+3.  Agora, vamos verificar o balanceamento das variáveis antes da implementação do escore de propensão. Faremos teste t de Student para variáveis contínuas e teste do chi-quadrado para variáveis categóricas.
+
+```{r}
+# Checando balanceamento entre os grupos antes da implementacao do escore de propensao
+## Variaveis continuas - teste t de Student
+t.test(age ~ treat, data = lalonde, var.equal = TRUE)
+t.test(educ ~ treat, data = lalonde, var.equal = TRUE)
+t.test(re74 ~ treat, data = lalonde, var.equal = TRUE)
+t.test(re75 ~ treat, data = lalonde, var.equal = TRUE)
+
+## Variaveis categoricas - teste do chi-quadrado
+descr::crosstab(lalonde$treat, lalonde$nodegree, prop.r = TRUE, chisq = TRUE, plot = FALSE)
+descr::crosstab(lalonde$treat, lalonde$married, prop.r = TRUE, chisq = TRUE, plot = FALSE)
+descr::crosstab(lalonde$treat, lalonde$black, prop.r = TRUE, chisq = TRUE, plot = FALSE)
+descr::crosstab(lalonde$treat, lalonde$hispan, prop.r = TRUE, chisq = TRUE, plot = FALSE)
+
+```
+
+Observe que as variáveis idedade, renda 1974, renda em 1975, não possuir diploma universitário, percentual de pretos, percentual de hispânicos e ser casado não se encontram balanceadas entre os grupo (todos os p-vaores são significantes). Apenas a variável escolaridade está balanceada entre os grupos tratamento e controle (p-valor não significante).
+
+\
+
+4.  Para variáveis contínuas, podemos, tambem, verificar balanceamento em modelo de regressão linear, colocando a variável contínua como resposta e o tratamento como variável explanatória. Veja um exemplo, a seguir, com a variável contínua renda em 1974.
+
+```{r}
+# Variavel continua - regressao linear com o tratamento como variavel explanatoria e a variavel continua (renda em 74) como resposta
+reg <- lm(re74 ~ treat, data = lalonde)
+summary(reg)
+
+```
+
+Observe que o p-valor para a variável tratamento (treat) foi significante, indicando que a renda em 1974 não estava balanceada entre os grupos.
+
+\
+
+5.  Para variáveis categóricas. podemos, também, verificar balanceamento em modelo de regressão logística, colocando a variável categórica como resposta e o tratamento como variável explanatória. Veja um exemplo, a seguir, com a variável categórica sem diploma universitário.
+
+```{r}
+# variavel categorica - regresao logistica com o tratamento como variavel explanatoria e a variavel categorica (sem diploma univeersitario) como resposta
+reg <- glm(nodegree ~ treat, data = lalonde, family = binomial(link = "logit"))
+summary(reg)
+```
+
+Observe que o p-valor para a variável tratamento (treat) foi significante, indicando que a variável não possuir diploma universitário não está balanceada entre os grupos.
+
+\
+
+6.  Vamos, agora, calcular o escore de propensão para cada indivíduo, que nada mais é do que a probabilidade de participação no programa predita pelo modelo. Para isso, vamos, inicialmente, rodar um modelo logístico, tendo como desfecho a participação no treinamento (treat) e como variáveis preditoras idade, escolaridade, cor da pele preta, hispânico, casado, sem diploma universitário, renda em 1974 e renda em 1975.
+
+```{r}
+# Estimacao do escore de propensao por regressao logistica
+pslog <- glm(treat ~ age + educ + black + hispan + nodegree + married 
+             + re74 + re75, family = binomial(link = "logit"), data = lalonde)
+summary(pslog)
+```
+
+\
+
+7.  Em seguida, vamos calcular e gravar o escore de propensão no banco de dados.
+
+```{r}
+# Incluindo o escore de propensao no banco de dados
+lalonde$pslog <- predict(pslog, type = "response")
+```
+
+Agora, peça uma listagem das 10 primeiras observações (tratados) e verifique que o escore de propensao (pslog) foi calculado e adicionado ao banco de dados.
+
+```{r}
+# Obtendo a listagem das 10 primeiras observacoes
+head(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+```{r}
+# Obtendo a listagem das 10 primeiras observacoes
+tail(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+\
+
+8.  Antes de realizar qualquer estimativa, é importante avaliar se existe **área de suporte comum** entre os tratados e seus potenciais controles. Vamos verificar a área de suporte comum, plotando um *boxplot* da distribuição do escore de propensão.
+
+```{r}
+# Verificando area de suporte comum pelo boxplot
+boxplot(pslog ~ treat, data = lalonde,
+        ylab = "Escore de propensão",
+        xlab = "Programa de retreinamento profissional")
+```
+
+Como você pode observar, na figura, há pouca zona de suporte comum. No grupo tratado, a maioria dos escores de propensão está acima de 0.4, ao passo que no grupo controle os escores predominam na faixa inferior a 0.2. Como vimos, nesse caso seria mais adequado estimar o **ATT** (Efeito médio do tratamento entre os tratados).
+
+\
+
+9.  Apesar de o efeito médiodo tratamento (ATE) não ser a melhor estimativa, vamos realizar o seu cálculo, para demonstração. Inicialmente, calcularemos os pesos para estimar o ATE, utilizando as fórmulas do próximo quadro. Em seguida, vamos obter uma listagem das primeiras 10 observações, para verificar que o peso (peso_ATE) foi incorporado ao banco de dados.
+
+| Efeito Causal                                      | Grupo      | Peso                            |
+|----------------------------------------------------|------------|---------------------------------|
+| Efeito médio do tratamento (ATE)                   | Tratamento | $\frac{1}{P[T=1|C]}$            |
+|                                                    | Controle   | $\frac{1}{(1-P[T=1|C])}$        |
+| Efeito médio do tratamento entre os tratados (ATT) | Tratamento | $1$                             |
+|                                                    | Controle   | $\frac{P[T=1|C]}{(1-P[T=1|C])}$ |
+
+: Cálculo dos pesos para tratamento binário
+
+```{r}
+# Ponderacao com escore de propensao
+## Calculando os pesos usando ATE - Efeito medio do tratamento
+
+## Para o grupo tratamento = 1/ps
+## Para o grupo controle = 1/(1-ps)
+
+lalonde$peso_ATE <- if_else(lalonde$treat == 1,
+                            1/lalonde$pslog,
+                            1/(1-lalonde$pslog))
+
+# Verificando se o peso foi incorporado ao banco de dados
+head(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+```{r}
+tail(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+\
+
+10. Para checar o balanceamento, após a ponderação com o escore de propensão, vamos estimar um modelo de regressão linear ponderado pelo escore de propensão, colocando a variável contínua como resposta e o tratamento como variável explanatória. Para isso, vamos usar o pacote `survey`, para o cálculo da variância robusta e obtensão da estimativa ponderada.
+
+```{r}
+# Checando balanceamento apos a ponderacao com o escore de propensao
+
+# Carregando o pacote survey para obter estimativa ponderada
+library(survey)
+
+# Variável contínua - regressao linear ponderada com o tratamento como variavel explanatoria e a variavel continua (renda em 1974) como resposta
+design_pslog <- survey::svydesign(ids = ~1, weights = ~peso_ATE, data = lalonde)
+
+glm <- survey::svyglm(re74 ~ treat, design = design_pslog)
+
+summary(glm)
+```
+
+Veja que para a variável contínua (renda em 1974) não foi obtido o balanceamento, pois o p-valor para a variável treat continuou significante (p=0.039).
+
+\
+
+11. E para variável categórica, vamos estimar modelo de regressão logística ponderando pelo escore de propensão, colocando a variável categórica como resposta e o tratamento como variável explanatória.
+
+```{r}
+# Variável categórica - regressao logistica ponderada com o tratamento como variavel explanatoria e a variavel categorica (sem diploma universitario) como variavel resposta
+glm <- svyglm(nodegree ~ treat, family = binomial(link = "logit"), design = design_pslog)
+summary(glm)
+
+```
+
+Observe que para a variável não possuir diploma universitário, o balanceamento foi obtido, pois o p-valor para a variável treat deixou de ser significante (p=0.452).
+
+\
+
+12. Como testes estatísticos não são o método mais adequado para verificar balanceamento, vamos usar o pacote `twang`, que realiza o cálculo das diferenças padronizadas absolutas nas médias das variáveis preditoras do tratamento, entre os grupos tratado e controle. Diferença padronizada absoluta nas médias \<0.10 desvio padrão indica balanceamento.
+
+```{r}
+# Usando rotina do pacote twang para verificar balanceamento
+# Diferencas padronizadas absolutas entre as medias
+
+bal_pslog <- twang::dx.wts(x = lalonde$peso_ATE, data = lalonde, 
+                           vars = c("age", "educ", "black", "hispan", 
+                                    "nodegree", "married", "re74", "re75"),
+                           treat.var = "treat", estimand = "ATE")
+  
+bal_pslog
+```
+
+```{r}
+
+bal <- twang::bal.table(bal_pslog)
+bal[[1]] %>% kableExtra::kable() %>% kableExtra::kable_classic()
+bal[[2]] %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+Observe que as estimativas das diferenças padronizadas absolutas entre as médias dos grupos tratamento e controle, após o balanceamento, para a maioria das variáveis, continua sendo acima de 0.10 (na coluna std.eff.sz na segunda listagem). Se usarmos um critério menos rigoroso, \<0.25, concluiríamos que apenas a variável renda em 1974 não estaria balanceada entre os grupos. Essa falta de balanceamento se deve, provavelmente, à reduzida zona de suporte comum existente entre os grupos. A alternativa, nesse caso, seria estimar o **ATT** ou tentar outro método para estimativa do escore de propensão. Pode ser que o balanceamento não tenha sido atingido por má especificação do modelo logístico. Essa má especificação pode ocorrer por não estarem incluidos os termos polinomiais, no caso de relações não lineares, ou por não estarem incluídas possíveis interações entre os preditores do tratamento.
+
+\
+
+13. Mesmo sem termos obtido o balanceamento entre as variáveis, vamos calcular o efeito médio do tratamento (ATE) em modelo de regressão liner, ponderado poelo escore de propensão, no pacote `survey`, para obtensão da estimativa ponderada.
+
+```{r}
+# Efeito causal 
+# Regressao linear incluindo defecho e apenas o tratamento como variavel explanatoria
+# Com ponderacao pelo escore de propensao
+# Pacote survey - obtensao da esstimativa ponderada
+design_pslog <- survey::svydesign(ids = ~1, weights = ~peso_ATE, data = lalonde)
+glm <- survey::svyglm(re78 ~ treat, design = design_pslog)
+summary(glm)
+```
+
+```{r}
+confint(glm)
+```
+
+Veja que a estimativa ajustada para o efeito do tratamento foi de 225 dólares, IC95% -1555 a 2009 dólares, com p=0.805, portanto não significante.
+
+\
+
+14. E seguida, vamops utilizar GBM (*Generalized Boosted Modeling*) para calcular o ATE, no pacote `twang`, para testar se a falta de balanceamento dos grupos de tratamento e controle pode ser devido à má especificação do modelo logístico. Nesse procedimento é gerado, inicialmente, um número pseudorandômico, toda vez que rodamos a rotina. Assim, podemos obter resultados diferentes toda vez que utilizamos o GBM com os mesmos dados. Por isso, usamos o comando `set.seed()` para gerar o mesmo número inicial e obter, assim, o mesmo resultado toda vez que usarmos essa rotina com esses dados.
+
+```{r}
+# GBM
+# Estimativa do escore de propensao - ATE
+set.seed(1)
+psgbmate <- twang::ps(formula = treat ~ age + educ + black 
+                      + hispan + nodegree + married + re74 + re75,
+                      data = lalonde, perm.test.iters = 0, estimand = "ATE",
+                      stop.method = ("es.mean"), verbose = FALSE)
+```
+
+\
+
+15. Utilize os seguintes comandos para verificar balanceamento.
+
+```{r}
+# Verificando balanceamento
+bal <- twang::bal.table(psgbmate)
+bal$unw %>% kableExtra::kable() %>% kableExtra::kable_classic()
+bal$es.mean.ATE %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+Observe o resultado do balanceamento na segunda listagem, na coluna `std.eff.sz`. Agora, apenas para variáveis percentual de hispânicos e não possuir diploma universitário foi obtido balanceamento, pois as diferenças padronizadas absolutas entre as médias dos grupos tratamento e controle ficaram \<0.10. Para as demais variáveis não obtivemos o balaceamento. Esse resultado sugere que a falta de balanceamento em relação às variáveis observadas se deveu não a problemas na especificação do modelo logístico, mas sim à falta de uma zona de suporte comum.
+
+Figura - Diferenças padronizadas absolutas entre as médias das variáveis nos grupos tratado e controle antes (*unweighted*) e após (*weighted*) ponderação com base no escore de propensão para estimativa do efeito causal médio (ATE).
+
+```{r}
+plot(psgbmate, plots = 3)
+```
+
+Verifique que as diferenças padronizadas absolutas para a estimativa da ATE, plotadas no fráfico, ficaram quase todas acima do limite aceitável (>0.10 desvio padrão).
+
+\
+
+16. Em seguida, vamos extrair os pesos a serem incluidos na ponderação para a estimativa de ATE, usando fórmulas para o cálcuo do peso, e incluí-los no banco de dados.
+
+```{r}
+# Extraindo os pesos
+lalonde$wate <- twang::get.weights(psgbmate, stop.method = "es.mean")
+design_psate <- survey::svydesign(ids = ~1, weights = ~wate, data = lalonde)
+
+# Obtendo a listegem do banco de dados
+head(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+tail(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+Verifique que foi incluída no banco de dados a variável `wate`.
+
+\
+
+17. Mesmo sem termos obtido balanceamento, vamos calcular o ATE em modelo de regressão linear, ponderado pelo escore de propensão.
+
+```{r}
+# Efeito causal - GBM
+# Regressao linear incluindo desfecho e apenas o tratamento como variavel explanatoria com ponderacao pelo escore de propensao
+glm1 <- survey::svyglm(re78 ~ treat, design = design_psate)
+summary(glm1)
+```
+
+```{r}
+# Obtendo intervalo de confianca
+confint(glm1)
+```
+
+A estimativa foi -491 dólares, IC95% -1975 a 994 dólares, com p=0.517, portanto, igual no grupo tratado, em comparação ao grupo controle, também não significante.
+
+\
+
+18. Finalmente, vamos utilizar GBM (*Generalized Boosted Modeling*) para calcular o ATT no pacote `twang`, para testar se a falta de balanceamento dos grupos tratamento e controle, na estimativa do ATE, pode ter se devido à flata de zona de suporte comum.
+
+```{r}
+# GBM
+# Estimativa do escore de propensao - ATT
+set.seed(1)
+psgbmatt <- twang::ps(treat ~ age + educ + black + hispan + nodegree 
+                      + married + re74 + re75, data = lalonde, 
+                      perm.test.iters = 0, estimand = "ATT",
+                      stop.method = ("es.mean"), verbose = FALSE)
+```
+
+\
+
+19. Utilize os seguintes comandos para verificar balanceamento.
+
+```{r}
+# Verificando balanceamento
+bal <- twang::bal.table(psgbmatt)
+bal[[1]] %>% kableExtra::kable() %>% kableExtra::kable_classic()
+bal[[2]] %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+Observe que, agora, apenas para as variáveis renda em 1974 e renda em 1975 não foi obtido o balanceamento, pois a diferença padronizada absoluta entre as médias dso grupos tratamento e controle ficou \>0.10 desvio padrão. Se adotássemos um ponto de corte menos rigoriso \<0.20 desvio padrão, concluiríamos que o balanceamento foi obtido em relação a todas as variáveis observadas. Este resultado sugere que a falta de balanceamento em relação as variáveis observadas na estimativa ATE não se deveu a problemas na especificação do modelo logístico, mas sim à falta de uma zona de suporte comum. No caso de usarmos apenas os tratados, consideramos que o balanceamento foi obtido (as estimativas estão próximas a 0.10) e podemos, então, dar prosseguimento à análise e interpretação do ATT.
+
+\
+Verifique as diferenças padronizadas absolutas para a estimativa do ATT plotadas no gráfico.
+
+```{r}
+plot(psgbmatt, plots = 3)
+```
+
+Diferenças padronizadas absolutas entre as médias da variáveis nos grupos tratado e controle antres (*unweighted*) e após (*weighted*) ponderação com base no escore de propenção para estimativa do efeito causal médio entre os tratados (ATT).
+
+\
+
+20. Em seguida, vamos extrair os pesos a serem incluídos na ponderação para a estimativa do ATT, usando as fórmulas para o cálculo, e incluí-los no banco de dados.
+
+```{r}
+# Extraindo os pesos
+lalonde$watt <- twang::get.weights(psgbmatt, stop.method = "es.mean")
+design_psatt <- survey::svydesign(ids = ~1, weights = ~watt, data = lalonde)
+
+# obtendo listagem do banco de dados
+head(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+tail(lalonde) %>% kableExtra::kable() %>% kableExtra::kable_classic()
+```
+
+Verifique que foi incluida no banco de dados a variável `watt`.
+
+\
+
+21. Para concluir este exercício, vamos calcuar o ATT em modelo de regressão
