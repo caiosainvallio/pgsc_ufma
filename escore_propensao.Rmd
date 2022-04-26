@@ -152,7 +152,7 @@ descr::crosstab(lalonde$treat, lalonde$hispan, prop.r = TRUE, chisq = TRUE, plot
 
 ```
 
-Observe que as variáveis idedade, renda 1974, renda em 1975, não possuir diploma universitário, percentual de pretos, percentual de hispânicos e ser casado não se encontram balanceadas entre os grupo (todos os p-vaores são significantes). Apenas a variável escolaridade está balanceada entre os grupos tratamento e controle (p-valor não significante).
+Observe que as variáveis idade, renda 1974, renda em 1975, não possuir diploma universitário, percentual de pretos, percentual de hispânicos e ser casado não se encontram balanceadas entre os grupo (todos os p-vaores são significantes). Apenas a variável escolaridade está balanceada entre os grupos tratamento e controle (p-valor não significante).
 
 \
 
@@ -457,4 +457,29 @@ Verifique que foi incluida no banco de dados a variável `watt`.
 
 \
 
-21. Para concluir este exercício, vamos calcuar o ATT em modelo de regressão
+21. Para concluir este exercício, vamos calcuar o ATT em modelo de regressão linear, ponderado pelo escore de propensão.
+
+```{r}
+# Efeito causal - GBM
+# Regressao linear incluindo desfecho e apenas o tratamento como variavel explanatoria com ponderacao pelo escore de propensao
+glm1 <- survey::svyglm(re78 ~ treat, design = design_psatt)
+summary(glm1)
+```
+
+```{r}
+# Obtendo intervalo de confianca
+confint(glm1)
+```
+
+A estimativa obtida, 461 dólares, IC95% -1422 a 2344, foi igual no grupo tratado em comparação ao grupo controle, com p=0.632. Concluímos, então, que o programa de retreinamento não aumentou a renda dos indivíduos. Esta conclusão será válida se os pressupostos p\[ara inferência causal forem verdadeiros: permutabilidade, positividade e estabilidade do efeito causal (SUTVA, *Stable Unit Treatment Value Assumption*). Assumindo que o tratmento foi administrado de forma padronixada e que não houve contaminação, consideramos que o pressuposto SUTVA é razoável. Usando-se o ATT, supõe-se que foi possível obter contrastes contrafatuais adequados na ausência de randomização para os tratados. O pressuposto de positividade é bem razoável neste exemplo. Obtivemos permutabilidade em relação às variáveis observadas. Resta a possibilidade de confundimento por variável omitida. Essa nossa estimativa do efeito causal é válida desde que sejam válidos os nossos pressupostos, que foram claramente explicitados.
+
+\
+É interessante que, neste exemplo, que o modelo de regressão convencional, ajustado para as variáveis de confundimento, sugeriu associação entre o programa de retreinamento profissional e o aumento da renda. Entretanto, nas estimativas obtidas em modelos ponderados pelo inverso da probabilidade de treinamento, esse efeito não foi significante.
+
+\
+
+------------------------------------------------------------------------
+
+##  1.2 Pareamento com escore de propensão
+
+1.   Nesta parte, vasmos vamos realizar a estimativa do efeito

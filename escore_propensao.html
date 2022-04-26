@@ -178,6 +178,7 @@ pre code {
 <li><a href="#estimativa-do-efeito-causal-por-meio-do-escore-de-propensão">1. Estimativa do efeito causal por meio do escore de propensão</a>
 <ul>
 <li><a href="#ponderação-com-escore-de-propensão">1.1 Ponderação com escore de propensão</a></li>
+<li><a href="#section"></a></li>
 </ul></li>
 </ul>
 </div>
@@ -1062,7 +1063,7 @@ descr::crosstab(lalonde$treat, lalonde$nodegree, prop.r = TRUE, chisq = TRUE, pl
 ## ------------------------------------------------------------
 ## Qui² = 7.766359      g.l. = 1      p = 0.00532 
 ##         Frequência esperada mínima: 21.69381</code></pre>
-<p>Observe que as variáveis idedade, renda 1974, renda em 1975, não possuir diploma universitário, percentual de pretos, percentual de hispânicos e ser casado não se encontram balanceadas entre os grupo (todos os p-vaores são significantes). Apenas a variável escolaridade está balanceada entre os grupos tratamento e controle (p-valor não significante).</p>
+<p>Observe que as variáveis idade, renda 1974, renda em 1975, não possuir diploma universitário, percentual de pretos, percentual de hispânicos e ser casado não se encontram balanceadas entre os grupo (todos os p-vaores são significantes). Apenas a variável escolaridade está balanceada entre os grupos tratamento e controle (p-valor não significante).</p>
 <p><br />
 </p>
 <ol start="4" style="list-style-type: decimal">
@@ -5565,8 +5566,43 @@ watt
 <p><br />
 </p>
 <ol start="21" style="list-style-type: decimal">
-<li>Para concluir este exercício, vamos calcuar o ATT em modelo de regressão</li>
+<li>Para concluir este exercício, vamos calcuar o ATT em modelo de regressão linear, ponderado pelo escore de propensão.</li>
 </ol>
+<pre class="r"><code># Efeito causal - GBM
+# Regressao linear incluindo desfecho e apenas o tratamento como variavel explanatoria com ponderacao pelo escore de propensao
+glm1 &lt;- survey::svyglm(re78 ~ treat, design = design_psatt)
+summary(glm1)</code></pre>
+<pre><code>## 
+## Call:
+## svyglm(formula = re78 ~ treat, design = design_psatt)
+## 
+## Survey design:
+## survey::svydesign(ids = ~1, weights = ~watt, data = lalonde)
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)   5885.6      767.7   7.666 6.99e-14 ***
+## treat          463.5      960.6   0.483     0.63    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for gaussian family taken to be 50196990)
+## 
+## Number of Fisher Scoring iterations: 2</code></pre>
+<pre class="r"><code># Obtendo intervalo de confianca
+confint(glm1)</code></pre>
+<pre><code>##                 2.5 %   97.5 %
+## (Intercept)  4377.869 7393.334
+## treat       -1422.916 2350.000</code></pre>
+<p>A estimativa obtida, 461 dólares, IC95% -1422 a 2344, foi igual no grupo tratado em comparação ao grupo controle, com p=0.632. Concluímos, então, que o programa de retreinamento não aumentou a renda dos indivíduos. Esta conclusão será válida se os pressupostos p[ara inferência causal forem verdadeiros: permutabilidade, positividade e estabilidade do efeito causal (SUTVA, <em>Stable Unit Treatment Value Assumption</em>). Assumindo que o tratmento foi administrado de forma padronixada e que não houve contaminação, consideramos que o pressuposto SUTVA é razoável. Usando-se o ATT, supõe-se que foi possível obter contrastes contrafatuais adequados na ausência de randomização para os tratados. O pressuposto de positividade é bem razoável neste exemplo. Obtivemos permutabilidade em relação às variáveis observadas. Resta a possibilidade de confundimento por variável omitida. Essa nossa estimativa do efeito causal é válida desde que sejam válidos os nossos pressupostos, que foram claramente explicitados.</p>
+<p><br />
+É interessante que, neste exemplo, que o modelo de regressão convencional, ajustado para as variáveis de confundimento, sugeriu associação entre o programa de retreinamento profissional e o aumento da renda. Entretanto, nas estimativas obtidas em modelos ponderados pelo inverso da probabilidade de treinamento, esse efeito não foi significante.</p>
+<p><br />
+</p>
+<hr />
+</div>
+<div id="section" class="section level2">
+<h2></h2>
 </div>
 </div>
 
